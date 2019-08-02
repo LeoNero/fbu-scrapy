@@ -49,11 +49,11 @@ class ParsePipeline(object):
 
     def __get_news_article_from_item(self, item):
         return {
-            'Name': item['name'][0],
-            'BodySnippet': item['body_snippet'][0],
-            'Body': item['body'][0],
-            'Author': item['author'][0],
-            'Source': item['source'][0]
+            'Name': item['name'],
+            'BodySnippet': item['body_snippet'],
+            'Body': item['body'],
+            'Author': item['author'],
+            'Source': item['source']
         }
 
     def __news_article_does_not_exist(self, news_article):
