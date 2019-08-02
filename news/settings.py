@@ -9,6 +9,10 @@ NEWSPIDER_MODULE = 'news.spiders'
 ROBOTSTXT_OBEY = True
 
 # Configure item pipelines
+ITEM_PIPELINES = {
+    'news.pipelines.ParsePipeline': 100,
+}
+
 # Parse settings
 PARSE_APP_ID = 'LeoHaleyPlaxides'
 PARSE_MASTER_KEY = 'LeoHaleyPlaxides'
