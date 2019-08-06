@@ -32,6 +32,9 @@ class CnnSpider(CrawlSpider):
         else:
             news.add_css('author', 'span.metadata__byline__author a::text')
 
+        if response.css('.media__image::attr(data-src-medium)').get() != None:
+            news.add_css('image', '.media__image::attr(data-src-medium)')
+
         news.add_css('body_snippet', '.zn-body__paragraph.speakable *::text')
         news.add_css('body', '.zn-body__paragraph *::text')
         news.add_value('source', response.url)
