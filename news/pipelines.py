@@ -53,7 +53,8 @@ class ParsePipeline(object):
             'BodySnippet': item['body_snippet'],
             'Body': item['body'],
             'Author': item['author'],
-            'Source': item['source']
+            'Source': item['source'],
+            'Image': item['image']
         }
 
     def __news_article_does_not_exist(self, news_article):
