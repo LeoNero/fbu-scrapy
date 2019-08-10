@@ -3,7 +3,19 @@ from scrapy.loader.processors import TakeFirst, Join, MapCompose
 
 def clean_url(value):
     if value != None and value != '':
-        return value[2:]
+        splitted_url = value.split('//')
+        protocol = splitted_url[0]
+
+        if protocol == '':
+            return 'https:' + value
+
+        if len(splitted_url) == 1:
+          return 'https://' + value
+
+        if protocol != 'https:' or protocol != 'http:':
+            return value
+
+        return 'https://' + value
     return value
 
 class NewsItem(scrapy.Item):
