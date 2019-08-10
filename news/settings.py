@@ -17,3 +17,6 @@ ITEM_PIPELINES = {
 PARSE_APP_ID = 'LeoHaleyPlaxides'
 PARSE_MASTER_KEY = 'LeoHaleyPlaxides'
 PARSE_SERVER_URL = 'http://fbu-team-app.herokuapp.com/parse'
+
+# Watson settings
+WATSON_API_KEY = 'youwillneverknowhahaha'
