@@ -8,7 +8,7 @@ class CnnSpider(CrawlSpider):
     name = "cnn"
     allowed_domains = ["www.cnn.com"]
     start_urls = [
-        "https://www.cnn.com/politics"
+        "https://www.cnn.com/"
     ]
 
     rules = (

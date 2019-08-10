@@ -1,99 +1,114 @@
-import requests
-import json
-import logging
+from functools import reduce
+from news.parse import Parse
+from news.watson import Watson
 
 class ParsePipeline(object):
-    news_article_path = '/classes/NewsArticle'
+    nodes_name_list = []
+    nodes_name_id_dict = {}
+    word2vec_model = None
 
-    def __init__(self, app_id, master_key, server_url):
-        self.app_id = app_id
-        self.master_key = master_key
-        self.server_url = server_url
-        self.news_article_url = self.server_url + ParsePipeline.news_article_path
+    def __init__(self, parse_app_id, parse_master_key, parse_server_url, watson_api_key):
+        self.parse = Parse(parse_app_id, parse_master_key, parse_server_url)
+        self.watson = Watson(watson_api_key)
 
     @classmethod
     def from_crawler(cls, crawler):
         return cls(
-            app_id=crawler.settings.get('PARSE_APP_ID'),
-            master_key=crawler.settings.get('PARSE_MASTER_KEY'),
-            server_url=crawler.settings.get('PARSE_SERVER_URL')
+            parse_app_id=crawler.settings.get('PARSE_APP_ID'),
+            parse_master_key=crawler.settings.get('PARSE_MASTER_KEY'),
+            parse_server_url=crawler.settings.get('PARSE_SERVER_URL'),
+            watson_api_key=crawler.settings.get('WATSON_API_KEY')
         )
 
     def open_spider(self, spider):
-        self.__initializeSession()
-        self.__setDefaultHeaders()
+        self.parse.open_connection()
 
     def close_spider(self, spider):
-        self.session.close()
+        self.parse.close_connection()
 
     def process_item(self, item, spider):
-        self.__save_item(item)
+        body_words = self.__get_body_words(item['body'])
+
+        matches = self.__match_body_words_to_nodes(body_words)
+        item['tags'] = matches
+
+        self.parse.save_item(item)
         return item
 
-    def __initializeSession(self):
-        self.session = requests.Session()
+    def __get_body_words(self, body):
+        analyze_response = self.watson.analyze_body(body)
+        analyze_response_json = analyze_response.json()
+        return self.__analyze_response_to_list(analyze_response_json)
 
-    def __setDefaultHeaders(self):
-        self.session.headers.update({
-            'X-Parse-Application-Id': 'LeoHaleyPlaxides',
-            'X-Parse-Master-Key': 'LeoHaleyPlaxides'
-        })
+    def __analyze_response_to_list(self, analyze_response):
+        keywords = analyze_response['keywords']
+        entities = analyze_response['entities']
+        concepts = analyze_response['concepts']
+        categories = analyze_response['categories']
 
-    def __save_item(self, item):
-        news_article = self.__get_news_article_from_item(item)
+        words_set = set()
+        keywords_set = self.__get_set(keywords)
+        entities_set = self.__get_set(entities)
+        concepts_set = self.__get_set(concepts)
+        categories_set = self.__get_categories_set(categories)
 
-        if self.__news_article_does_not_exist(news_article):
-            self.__save_news_article(news_article)
-        else:
-            logging.info("Article with url %s already exists in Parse", news_article['Source'])
+        words_set = words_set.union(keywords_set)
+        words_set = words_set.union(entities_set)
+        words_set = words_set.union(concepts_set)
+        words_set = words_set.union(categories_set)
 
-    def __get_news_article_from_item(self, item):
-        return {
-            'Name': item['name'],
-            'BodySnippet': item['body_snippet'],
-            'Body': item['body'],
-            'Author': item['author'],
-            'Source': item['source'],
-            'Image': item['image']
-        }
+        return list(words_set)
 
-    def __news_article_does_not_exist(self, news_article):
-        source = news_article['Source']
-        params = self.__find_article_by_source_params(source)
-        response = self.session.get(
-            self.news_article_url,
-            params=params
-        )
-        json_response = response.json()
-        results = json_response['results']
-        results_size = len(results)
+    def __get_set(self, res):
+        def clean_words(x, y):
+            text = y['text']
+            relevance = y['relevance']
+            splitted_words = text.split(' ')
+            filtered_words = list(filter(None, splitted_words))
+            new_words = list(map(lambda x: { 'text': x, 'relevance': relevance }, filtered_words))
+            return x + new_words
 
-        return results_size == 0
+        words_dict_list = reduce(clean_words, res, [])
+        filtered_words = list(filter(lambda x: x['relevance'] >= 0.50, words_dict_list))
+        words = set(map(lambda x: x['text'], filtered_words))
+        return words
 
-    def __save_news_article(self, news_article):
-        save_response = self.session.post(
-            self.news_article_url,
-            json=news_article
-        )
-        self.__handle_save_response(save_response, news_article)
+    def __get_categories_set(self, res):
+        def clean_categories(x, y):
+            label = y['label']
+            relevance = y['score']
+            splitted_categories = label.split('/')
+            filtered_categories = list(filter(None, splitted_categories))
+            new_categories = list(map(lambda x: { 'text': x, 'relevance': relevance }, filtered_categories))
+            return x + new_categories
 
-    def __find_article_by_source_params(self, source):
-        return {
-            'where': json.dumps({
-                'Source': {
-                    '$in': [source]
-                }
+        categories = reduce(clean_categories, res, [])
+        return self.__get_set(categories)
+
+    def __match_body_words_to_nodes(self, body_words):
+        similar_nodes = set(self.__get_similar_nodes(body_words))
+        node_ids = set(map(lambda x: ParsePipeline.nodes_name_id_dict[x], similar_nodes))
+        parse_pointers = self.__ids_to_parse_pointers(node_ids)
+        return parse_pointers
+
+    def __get_similar_nodes(self, body_words):
+        similar_words = []
+        for body_word in body_words:
+            for node in ParsePipeline.nodes_name_list:
+                try:
+                    similarity = ParsePipeline.word2vec_model.wv.similarity(w1=body_word, w2=node)
+                    if similarity >= 0.40:
+                        similar_words.append(node)
+                except(KeyError):
+                    pass
+        return similar_words
+
+    def __ids_to_parse_pointers(self, ids):
+        pointers = []
+        for object_id in ids:
+            pointers.append({
+                '__type': 'Pointer',
+                'className': 'Node',
+                'objectId': object_id
             })
-        }
-
-    def __handle_save_response(self, save_response, news_article):
-        save_response_json = save_response.json()
-        if save_response.status_code == 201:
-            logging.info(
-                "Article with url %s saved, and has id %s :)",
-                news_article['Source'],
-                save_response_json['objectId']
-            )
-        else:
-            logging.error("Article with url %s not saved :( or response was not the expected", news_article['Source'])
-            logging.error(save_response_json)
+        return pointers
