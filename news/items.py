@@ -16,3 +16,4 @@ class NewsItem(scrapy.Item):
         input_processor=MapCompose(clean_url),
         output_processor=TakeFirst()
     )
+    tags = scrapy.Field()
