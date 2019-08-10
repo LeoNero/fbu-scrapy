@@ -5,9 +5,6 @@ from news.pipelines import ParsePipeline
 import gensim
 import sys
 
-nodes_name_list = []
-nodes_name_id_dict = {}
-
 def get_name(node):
     return node['name']
 

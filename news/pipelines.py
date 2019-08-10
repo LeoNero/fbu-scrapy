@@ -76,7 +76,7 @@ class ParsePipeline(object):
     def __get_categories_set(self, res):
         def clean_categories(x, y):
             label = y['label']
-            relevance = y['score']#
+            relevance = y['score']
             splitted_categories = label.split('/')
             filtered_categories = list(filter(None, splitted_categories))
             new_categories = list(map(lambda x: { 'text': x, 'relevance': relevance }, filtered_categories))
