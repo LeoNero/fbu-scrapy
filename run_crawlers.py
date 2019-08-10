@@ -45,6 +45,8 @@ def main():
 
     process = CrawlerProcess(settings)
     process.crawl('cnn')
+    process.crawl('bbc')
+    process.crawl('npr')
     process.start()
 
 main()
